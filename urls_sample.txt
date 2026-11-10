@@ -1,0 +1,5 @@
+# Sample URLs for batch extraction testing
+https://www.python.org
+https://github.com
+https://news.ycombinator.com
+https://en.wikipedia.org/wiki/Python_(programming_language)
