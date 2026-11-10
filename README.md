@@ -1,46 +1,43 @@
-# Web Metadata Extractor & Website Crawler
+# Web Metadata Extractor & Website Crawler (MTE)
 
-A clean, standalone Python tool to extract and audit Canonical URLs, Titles, and Meta Descriptions from any website, with automatic internal crawling.
+A clean, standalone Python CLI tool to extract and audit Canonical URLs, Titles, and Meta Descriptions from any website, with automatic internal crawling.
 
 ---
 
-## 🚀 Quick Start
+## ⚡ Instant Command: `mte` or `MTE`
 
-### 1. Install Dependencies
+You can run the tool by typing **`mte`** directly from anywhere in your terminal:
+
 ```bash
-pip install -r requirements.txt
+# Interactive mode
+mte
+
+# Extract a single URL
+mte https://www.python.org
+
+# Crawl an entire website (discovers up to 20 pages)
+mte https://www.python.org --crawl --limit 20
+
+# Export results to CSV
+mte https://www.python.org --crawl --limit 15 -o results.csv
+
+# Batch extract from a text file of URLs
+mte -f urls_sample.txt -o batch_results.csv
 ```
 
-### 2. Extract a Single URL
-```bash
-python extractor.py https://www.python.org
-```
+---
 
-### 3. Crawl a Website (Finds & Extracts Internal Pages)
-Specify a seed URL and how many pages to crawl:
-```bash
-python extractor.py https://www.python.org --crawl --limit 10
-```
+## 🚀 Installation & Setup
 
-### 4. Save to CSV or JSON
-```bash
-# Save crawl results to CSV
-python extractor.py https://www.python.org --crawl --limit 20 -o results.csv
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-# Save single URL to JSON
-python extractor.py https://www.python.org -o python_meta.json
-```
-
-### 5. Batch Extract from a List of URLs
-```bash
-python extractor.py -f urls_sample.txt -o batch_results.csv
-```
-
-### 6. Interactive Mode
-Run with no arguments to enter interactive prompt mode:
-```bash
-python extractor.py
-```
+2. **Register the global `mte` command (optional):**
+   ```bash
+   pip install -e .
+   ```
 
 ---
 

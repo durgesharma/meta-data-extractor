@@ -168,8 +168,7 @@ class MetadataExtractor:
 
     def extract(self, url: str, extract_links: bool = False, base_domain: str = "") -> MetadataResult:
         """Fetches the page and extracts URL, title, description, and auxiliary metadata."""
-        parsed = urlparse(url)
-        if not parsed.scheme:
+        if "://" not in url:
             url = f"https://{url}"
 
         result = MetadataResult(input_url=url)
@@ -189,17 +188,23 @@ class MetadataExtractor:
                 result.error = f"HTTP Error {response.status_code}: {response.reason}"
                 return result
 
-            content_type = response.headers.get("Content-Type", "").lower()
+            content_type = (response.headers.get("Content-Type") or "").lower()
             if "text/html" not in content_type and "application/xhtml+xml" not in content_type:
                 result.error = f"Non-HTML content type: {content_type}"
                 return result
+
+            # Ensure proper Unicode decoding (prevents replacement chars like  on smart quotes/dashes)
+            if response.encoding is None or response.encoding.lower() == "iso-8859-1":
+                response.encoding = response.apparent_encoding or "utf-8"
 
             soup = BeautifulSoup(response.text, "html.parser")
 
             # 1. Meta URLs (Canonical & og:url)
             canonical_tag = soup.find(
                 "link",
-                rel=lambda val: val and "canonical" in (val if isinstance(val, str) else " ".join(val)).lower()
+                rel=lambda val: val and "canonical" in (
+                    val.lower() if isinstance(val, str) else " ".join(str(v).lower() for v in val)
+                )
             )
             if canonical_tag and canonical_tag.get("href"):
                 raw_canonical = canonical_tag.get("href", "").strip()
