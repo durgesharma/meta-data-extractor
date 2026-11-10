@@ -15,5 +15,6 @@ dependencies = [
 ]
 
 [project.scripts]
+meta-d = "extractor:main"
+mata-d = "extractor:main"
 mte = "extractor:main"
-MTE = "extractor:main"

@@ -1,28 +1,28 @@
-# Web Metadata Extractor & Website Crawler (MTE)
+# Web Metadata Extractor & Website Crawler (`mata-d`)
 
 A clean, standalone Python CLI tool to extract and audit Canonical URLs, Titles, and Meta Descriptions from any website, with automatic internal crawling.
 
 ---
 
-## ⚡ Instant Command: `mte` or `MTE`
+## ⚡ Instant Command: `mata-d` (or `meta-d`)
 
-You can run the tool by typing **`mte`** directly from anywhere in your terminal:
+You can run the tool by typing **`mata-d`** directly in your terminal:
 
 ```bash
-# Interactive mode
-mte
+# 1. Interactive mode
+mata-d
 
-# Extract a single URL
-mte https://www.python.org
+# 2. Extract a single URL
+mata-d https://www.python.org
 
-# Crawl an entire website (discovers up to 20 pages)
-mte https://www.python.org --crawl --limit 20
+# 3. Crawl an entire website (e.g. up to 20 pages)
+mata-d https://www.python.org --crawl --limit 20
 
-# Export results to CSV
-mte https://www.python.org --crawl --limit 15 -o results.csv
+# 4. Save crawl results to a CSV file
+mata-d https://www.python.org --crawl --limit 20 -o results.csv
 
-# Batch extract from a text file of URLs
-mte -f urls_sample.txt -o batch_results.csv
+# 5. Batch extract from a text file of URLs
+mata-d -f urls_sample.txt -o batch_results.csv
 ```
 
 ---
@@ -34,7 +34,7 @@ mte -f urls_sample.txt -o batch_results.csv
    pip install -r requirements.txt
    ```
 
-2. **Register the global `mte` command (optional):**
+2. **Register the global `mata-d` command:**
    ```bash
    pip install -e .
    ```
