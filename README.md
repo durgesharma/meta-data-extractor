@@ -80,6 +80,24 @@ for page in results:
 
 ---
 
+## ❓ Troubleshooting & Common Questions
+
+### Q: PowerShell shows `"The command meta-d was not found, but does exist in the current location. Instead type: .\meta-d"`
+* **Why this happens:** Windows PowerShell has a safety policy where it does not run scripts from the current folder unless you add `.\` in front.
+* **Fix 1 (Quick):** Run with **`.\`** in front:
+  ```powershell
+  .\meta-d 3000
+  ```
+* **Fix 2 (Permanent):** Run `pip install -e .` and **restart your terminal window**. Once reopened, Windows refreshes your PATH and you can type `meta-d` anywhere without `.\`.
+
+### Q: Port 3000 is already in use by another app?
+* Meta-D automatically detects port conflicts and switches to the next free port (e.g. `3001`), or you can specify any custom port:
+  ```bash
+  meta-d 5000
+  ```
+
+---
+
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
