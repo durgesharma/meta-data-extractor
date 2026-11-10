@@ -7,6 +7,7 @@ name = "meta-data-extractor"
 version = "1.0.0"
 description = "Web Metadata Extractor & Website Crawler"
 readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.8"
 dependencies = [
     "requests>=2.31.0",
@@ -17,4 +18,3 @@ dependencies = [
 [project.scripts]
 meta-d = "extractor:main"
 mata-d = "extractor:main"
-mte = "extractor:main"

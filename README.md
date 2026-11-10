@@ -1,28 +1,28 @@
-# Web Metadata Extractor & Website Crawler (`mata-d`)
+# Web Metadata Extractor & Website Crawler (`meta-d`)
 
 A clean, standalone Python CLI tool to extract and audit Canonical URLs, Titles, and Meta Descriptions from any website, with automatic internal crawling.
 
 ---
 
-## ⚡ Instant Command: `mata-d` (or `meta-d`)
+## ⚡ Instant Command: `meta-d` (or `mata-d`)
 
-You can run the tool by typing **`mata-d`** directly in your terminal:
+You can run the tool by typing **`meta-d`** directly in your terminal:
 
 ```bash
 # 1. Interactive mode
-mata-d
+meta-d
 
 # 2. Extract a single URL
-mata-d https://www.python.org
+meta-d https://www.python.org
 
 # 3. Crawl an entire website (e.g. up to 20 pages)
-mata-d https://www.python.org --crawl --limit 20
+meta-d https://www.python.org --crawl --limit 20
 
 # 4. Save crawl results to a CSV file
-mata-d https://www.python.org --crawl --limit 20 -o results.csv
+meta-d https://www.python.org --crawl --limit 20 -o results.csv
 
 # 5. Batch extract from a text file of URLs
-mata-d -f urls_sample.txt -o batch_results.csv
+meta-d -f urls_sample.txt -o batch_results.csv
 ```
 
 ---
@@ -34,7 +34,7 @@ mata-d -f urls_sample.txt -o batch_results.csv
    pip install -r requirements.txt
    ```
 
-2. **Register the global `mata-d` command:**
+2. **Register the global `meta-d` command:**
    ```bash
    pip install -e .
    ```
@@ -59,3 +59,9 @@ results = extractor.crawl_and_extract("https://www.python.org", max_urls=15)
 for page in results:
     print(page.final_url, "->", page.title)
 ```
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
