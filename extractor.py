@@ -510,13 +510,35 @@ def save_results(results: list[MetadataResult], output_path: str) -> None:
 
 
 def main() -> None:
+    # 0. Web GUI trigger: e.g. "meta-d 3000", "meta-d gui", "meta-d --gui 5000"
+    if len(sys.argv) > 1:
+        first_arg = sys.argv[1].strip()
+        if first_arg.isdigit():
+            from gui import start_gui
+            start_gui(port=int(first_arg))
+            return
+        if first_arg.lower() in ("gui", "--gui", "web", "--web"):
+            port = 3000
+            if len(sys.argv) > 2 and sys.argv[2].strip().isdigit():
+                port = int(sys.argv[2].strip())
+            from gui import start_gui
+            start_gui(port=port)
+            return
+
     parser = argparse.ArgumentParser(
         description="Meta URL, Title, and Description Extractor & Website Crawler."
     )
     parser.add_argument(
         "url",
         nargs="?",
-        help="Target web page URL (e.g. https://python.org)",
+        help="Target web page URL (e.g. https://python.org) or port number for GUI",
+    )
+    parser.add_argument(
+        "-g", "--gui",
+        nargs="?",
+        const=3000,
+        type=int,
+        help="Launch minimal Web GUI dashboard on specified port (default: 3000)",
     )
     parser.add_argument(
         "-c", "--crawl",
@@ -551,6 +573,12 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    # If --gui flag was passed
+    if args.gui:
+        from gui import start_gui
+        start_gui(port=args.gui)
+        return
 
     extractor = MetadataExtractor(timeout=args.timeout)
 
@@ -593,7 +621,7 @@ def main() -> None:
     console.print(
         Panel.fit(
             "[bold cyan]Web Metadata Extractor & Crawler[/bold cyan]\n"
-            "• Single URL extraction\n"
+            "• Type a URL to inspect (or '3000' to open the Web GUI)\n"
             "• Automatic Website Crawling (discovers internal links)\n"
             "[dim]Press Enter without text to exit.[/dim]",
             border_style="cyan"
@@ -602,9 +630,14 @@ def main() -> None:
 
     while True:
         try:
-            target_url = console.input("\n[bold yellow]Enter Website or URL[/bold yellow] (or 'q' to quit): ").strip()
+            target_url = console.input("\n[bold yellow]Enter Website or URL[/bold yellow] (or port like '3000', 'q' to quit): ").strip()
             if not target_url or target_url.lower() in ("q", "quit", "exit"):
                 console.print("[dim]Exiting extractor. Goodbye![/dim]")
+                break
+
+            if target_url.isdigit():
+                from gui import start_gui
+                start_gui(port=int(target_url))
                 break
 
             crawl_choice = console.input("[cyan]Crawl internal links from this website?[/cyan] (y/N): ").strip().lower()

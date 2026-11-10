@@ -9,21 +9,39 @@ A clean, standalone Python CLI tool to extract and audit Canonical URLs, Titles,
 You can run the tool by typing **`meta-d`** directly in your terminal:
 
 ```bash
-# 1. Interactive mode
+# 1. Launch the Visual Web GUI (on any port you want!)
+meta-d 3000
+
+# 2. Interactive CLI mode
 meta-d
 
-# 2. Extract a single URL
+# 3. Extract a single URL
 meta-d https://www.python.org
 
-# 3. Crawl an entire website (e.g. up to 20 pages)
+# 4. Crawl an entire website (e.g. up to 20 pages)
 meta-d https://www.python.org --crawl --limit 20
 
-# 4. Save crawl results to a CSV file
+# 5. Save crawl results to a CSV file
 meta-d https://www.python.org --crawl --limit 20 -o results.csv
 
-# 5. Batch extract from a text file of URLs
+# 6. Batch extract from a text file of URLs
 meta-d -f urls_sample.txt -o batch_results.csv
 ```
+
+---
+
+## 🖥️ Minimal Web GUI (For Non-Technical Users)
+
+If someone doesn't want to use the terminal at all, they can simply type:
+```bash
+meta-d 3000
+```
+* Automatically starts a local web server at `http://localhost:3000`.
+* Opens automatically in their default web browser.
+* Clean visual UI to extract single pages or crawl entire sites.
+* Live SEO badges (`Optimal`, `Short`, `Too Long`, `Missing`).
+* One-click **Download CSV** and **Download JSON** buttons.
+* If port 3000 is already in use by another program, it automatically switches to the next free port!
 
 ---
 
