@@ -580,13 +580,13 @@ def main() -> None:
     parser.add_argument(
         "-a", "--all",
         action="store_true",
-        help="Crawl whole website: extract all internal URLs without limit",
+        help="Crawl whole website: extract all internal URLs without limit (no --crawl needed)",
     )
     parser.add_argument(
         "-l", "--limit",
         type=int,
-        default=15,
-        help="Maximum number of URLs to crawl and extract (default: 15, or 0 for unlimited)",
+        default=None,
+        help="Crawl up to this number of pages (e.g. -l 20, or -l 0 for whole website)",
     )
     parser.add_argument(
         "--links-output",
@@ -623,8 +623,9 @@ def main() -> None:
 
     extractor = MetadataExtractor(timeout=args.timeout)
 
-    # Determine crawl limit: --all forces 0 (unlimited)
-    crawl_limit = 0 if args.all else args.limit
+    # Automatically enable crawl if --all, --limit, --links-output, or --crawl is specified!
+    should_crawl = args.crawl or args.all or (args.limit is not None) or bool(args.links_output)
+    crawl_limit = 0 if args.all else (args.limit if args.limit is not None else 15)
 
     # 1. URL list from file
     if args.file:
@@ -643,8 +644,8 @@ def main() -> None:
             save_results(results, args.output)
         return
 
-    # 2. Crawl Mode on a seed URL (via -c or -a)
-    if args.url and (args.crawl or args.all):
+    # 2. Crawl Mode on a seed URL (automatically triggered by --all, --limit, or --crawl)
+    if args.url and should_crawl:
         results = extractor.crawl_and_extract(
             args.url,
             max_urls=crawl_limit,
