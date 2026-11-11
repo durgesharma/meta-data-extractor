@@ -18,13 +18,19 @@ meta-d
 # 3. Extract a single URL
 meta-d https://www.python.org
 
-# 4. Crawl an entire website (e.g. up to 20 pages)
+# 4. Crawl an entire website (custom limit or whole website)
 meta-d https://www.python.org --crawl --limit 20
 
-# 5. Save crawl results to a CSV file
+# 5. Crawl the WHOLE website (all pages with no limit)
+meta-d https://www.python.org --crawl --all
+
+# 6. Crawl and export ALL discovered website links into a text file
+meta-d https://www.python.org --crawl --all --links-output all_urls.txt
+
+# 7. Save crawl results to a CSV file
 meta-d https://www.python.org --crawl --limit 20 -o results.csv
 
-# 6. Batch extract from a text file of URLs
+# 8. Batch extract from a text file of URLs
 meta-d -f urls_sample.txt -o batch_results.csv
 ```
 

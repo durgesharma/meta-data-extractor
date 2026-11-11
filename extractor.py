@@ -327,10 +327,11 @@ class MetadataExtractor:
         seed_url: str,
         max_urls: int = 15,
         delay: float = 0.05,
+        export_links_file: str | None = None,
     ) -> list[MetadataResult]:
         """
         Crawls a website starting from a seed URL, discovers all internal links,
-        and extracts metadata from up to max_urls pages.
+        and extracts metadata from pages. If max_urls <= 0, crawls the whole website.
         """
         if "://" not in seed_url:
             seed_url = f"https://{seed_url}"
@@ -339,6 +340,9 @@ class MetadataExtractor:
         parsed_seed = urlparse(seed_url)
         base_domain = parsed_seed.netloc.lower()
 
+        is_unlimited = max_urls <= 0
+        limit_label = "Whole Website (All URLs / Unlimited)" if is_unlimited else f"{max_urls} pages"
+
         visited_urls: set[str] = set()
         queued_urls: set[str] = {seed_url}
         queue: deque[str] = deque([seed_url])
@@ -346,43 +350,71 @@ class MetadataExtractor:
 
         console.print(
             f"[bold cyan]Crawling domain:[/bold cyan] [green]{base_domain}[/green] "
-            f"(Target limit: [bold yellow]{max_urls}[/bold yellow] pages)"
+            f"(Target limit: [bold yellow]{limit_label}[/bold yellow])"
         )
+        if is_unlimited:
+            console.print("[dim]Tip: You can press Ctrl+C anytime to pause and save all extracted pages.[/dim]")
 
-        with Progress(
+        progress_columns = [
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("[cyan]{task.completed}/{task.total} URLs[/cyan]"),
+            BarColumn() if not is_unlimited else TextColumn(""),
+            TextColumn("[cyan]{task.completed}/{task.total} URLs[/cyan]") if not is_unlimited else TextColumn("[cyan]{task.completed} pages crawled ({task.fields[queued]} in queue)[/cyan]"),
             TimeElapsedColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task(f"Crawling {base_domain}...", total=max_urls)
+        ]
 
-            while queue and len(results) < max_urls:
-                current_url = queue.popleft()
-                norm_current = self._normalize_url(current_url)
-                if norm_current in visited_urls:
-                    continue
-                visited_urls.add(norm_current)
+        with Progress(*progress_columns, console=console) as progress:
+            task = progress.add_task(
+                f"Crawling {base_domain}...",
+                total=max_urls if not is_unlimited else None,
+                queued=len(queue),
+            )
 
-                res = self.extract(norm_current, extract_links=True, base_domain=base_domain)
-                results.append(res)
-                progress.advance(task)
+            try:
+                while queue and (is_unlimited or len(results) < max_urls):
+                    current_url = queue.popleft()
+                    norm_current = self._normalize_url(current_url)
+                    if norm_current in visited_urls:
+                        continue
+                    visited_urls.add(norm_current)
 
-                if res.final_url:
-                    visited_urls.add(self._normalize_url(res.final_url))
+                    res = self.extract(norm_current, extract_links=True, base_domain=base_domain)
+                    results.append(res)
+                    progress.update(task, advance=1, queued=len(queue))
 
-                for link in res.discovered_links:
-                    norm_link = self._normalize_url(link)
-                    if norm_link not in visited_urls and norm_link not in queued_urls:
-                        queued_urls.add(norm_link)
-                        queue.append(norm_link)
+                    if res.final_url:
+                        visited_urls.add(self._normalize_url(res.final_url))
 
-                if delay > 0 and queue:
-                    time.sleep(delay)
+                    for link in res.discovered_links:
+                        norm_link = self._normalize_url(link)
+                        if norm_link not in visited_urls and norm_link not in queued_urls:
+                            queued_urls.add(norm_link)
+                            queue.append(norm_link)
 
-        console.print(f"[bold green]Crawl completed![/bold green] Extracted [cyan]{len(results)}[/cyan] pages.")
+                    progress.update(task, queued=len(queue))
+
+                    if delay > 0 and queue:
+                        time.sleep(delay)
+            except KeyboardInterrupt:
+                console.print(f"\n[bold yellow]Crawl paused by user (Ctrl+C).[/bold yellow] Saving all {len(results)} pages extracted so far.")
+
+        all_site_urls = sorted(visited_urls | queued_urls)
+        self.last_discovered_urls = all_site_urls
+
+        console.print(
+            f"[bold green]Crawl completed![/bold green] Extracted [cyan]{len(results)}[/cyan] pages "
+            f"([yellow]{len(all_site_urls)}[/yellow] total website URLs discovered)."
+        )
+
+        if export_links_file:
+            try:
+                with open(export_links_file, "w", encoding="utf-8") as f:
+                    for u in all_site_urls:
+                        f.write(f"{u}\n")
+                console.print(f"[bold green]Saved all {len(all_site_urls)} discovered website URLs to:[/bold green] [cyan]{export_links_file}[/cyan]")
+            except Exception as e:
+                console.print(f"[bold red]Failed to export links file:[/bold red] {e}")
+
         return results
 
 
@@ -546,10 +578,19 @@ def main() -> None:
         help="Crawl mode: automatically discover and extract all internal URLs on the website",
     )
     parser.add_argument(
+        "-a", "--all",
+        action="store_true",
+        help="Crawl whole website: extract all internal URLs without limit",
+    )
+    parser.add_argument(
         "-l", "--limit",
         type=int,
         default=15,
-        help="Maximum number of URLs to crawl and extract (default: 15)",
+        help="Maximum number of URLs to crawl and extract (default: 15, or 0 for unlimited)",
+    )
+    parser.add_argument(
+        "--links-output",
+        help="Export all discovered internal website links/sitemap to a text or CSV file",
     )
     parser.add_argument(
         "-f", "--file",
@@ -582,6 +623,9 @@ def main() -> None:
 
     extractor = MetadataExtractor(timeout=args.timeout)
 
+    # Determine crawl limit: --all forces 0 (unlimited)
+    crawl_limit = 0 if args.all else args.limit
+
     # 1. URL list from file
     if args.file:
         try:
@@ -599,9 +643,13 @@ def main() -> None:
             save_results(results, args.output)
         return
 
-    # 2. Crawl Mode on a seed URL
-    if args.url and args.crawl:
-        results = extractor.crawl_and_extract(args.url, max_urls=args.limit)
+    # 2. Crawl Mode on a seed URL (via -c or -a)
+    if args.url and (args.crawl or args.all):
+        results = extractor.crawl_and_extract(
+            args.url,
+            max_urls=crawl_limit,
+            export_links_file=args.links_output,
+        )
         display_batch_table(results)
 
         if args.output:
@@ -622,7 +670,7 @@ def main() -> None:
         Panel.fit(
             "[bold cyan]Web Metadata Extractor & Crawler[/bold cyan]\n"
             "• Type a URL to inspect (or '3000' to open the Web GUI)\n"
-            "• Automatic Website Crawling (discovers internal links)\n"
+            "• Automatic Website Crawling (Single page, Custom limit, or Whole Website)\n"
             "[dim]Press Enter without text to exit.[/dim]",
             border_style="cyan"
         )
@@ -642,18 +690,31 @@ def main() -> None:
 
             crawl_choice = console.input("[cyan]Crawl internal links from this website?[/cyan] (y/N): ").strip().lower()
             if crawl_choice in ("y", "yes"):
-                limit_input = console.input("[cyan]How many URLs to extract? [default: 10][/cyan]: ").strip()
-                limit = int(limit_input) if limit_input.isdigit() and int(limit_input) > 0 else 10
-                results = extractor.crawl_and_extract(target_url, max_urls=limit)
+                limit_input = console.input("[cyan]How many URLs to extract? [default: 10, or 'all' for whole website][/cyan]: ").strip().lower()
+                if limit_input in ("all", "whole", "0"):
+                    limit = 0
+                elif limit_input.isdigit() and int(limit_input) > 0:
+                    limit = int(limit_input)
+                else:
+                    limit = 10
+
+                links_file_choice = console.input("[cyan]Also export all discovered site URLs to a text file? (filename or Enter to skip)[/cyan]: ").strip()
+                export_links = links_file_choice if links_file_choice else None
+
+                results = extractor.crawl_and_extract(target_url, max_urls=limit, export_links_file=export_links)
                 display_batch_table(results)
 
-                save_choice = console.input("\n[cyan]Export results to CSV or JSON? (enter filename or press Enter to skip)[/cyan]: ").strip()
+                save_choice = console.input("\n[cyan]Export metadata results to CSV or JSON? (enter filename or press Enter to skip)[/cyan]: ").strip()
                 if save_choice:
                     save_results(results, save_choice)
             else:
                 with console.status(f"[cyan]Fetching and extracting from {target_url}...[/cyan]"):
                     result = extractor.extract(target_url)
                 display_single_result(result)
+
+                save_choice = console.input("\n[cyan]Export results to CSV or JSON? (enter filename or press Enter to skip)[/cyan]: ").strip()
+                if save_choice:
+                    save_results([result], save_choice)
 
         except (KeyboardInterrupt, EOFError):
             console.print("\n[dim]Cancelled by user.[/dim]")

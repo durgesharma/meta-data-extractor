@@ -352,13 +352,22 @@ HTML_TEMPLATE = """
                     </label>
                     <label class="radio-label">
                         <input type="radio" name="mode" value="crawl" onchange="toggleMode()">
-                        <span>Crawl Entire Website</span>
+                        <span>Crawl Website</span>
                     </label>
                 </div>
 
                 <div class="crawl-settings" id="crawlSettings">
-                    <label for="crawlLimit">Maximum Pages to Crawl</label>
-                    <input type="number" id="crawlLimit" value="10" min="1" max="100" style="max-width: 150px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+                        <label for="crawlLimit" style="margin:0;">Page Limit</label>
+                        <label class="radio-label" style="font-size:0.85rem; color:#60a5fa;">
+                            <input type="checkbox" id="crawlAll" onchange="toggleCrawlAll()">
+                            <span><b>Whole Website (Unlimited)</b></span>
+                        </label>
+                    </div>
+                    <input type="number" id="crawlLimit" value="15" min="1" max="1000" style="max-width: 150px;">
+                    <div id="unlimitedHint" style="display:none; font-size:0.8rem; color:#9ca3af; margin-top:0.4rem;">
+                        ⚡ Crawls every discoverable internal link on the entire website.
+                    </div>
                 </div>
             </form>
         </div>
@@ -369,6 +378,7 @@ HTML_TEMPLATE = """
                 <div class="export-btns">
                     <button class="btn btn-outline" onclick="downloadExport('csv')">📥 Download CSV</button>
                     <button class="btn btn-outline" onclick="downloadExport('json')">📥 Download JSON</button>
+                    <button class="btn btn-outline" id="btnLinksExport" onclick="downloadSiteUrls()" style="display:none;">🔗 All Site URLs (.txt)</button>
                 </div>
             </div>
             <div id="resultsList"></div>
@@ -384,11 +394,19 @@ HTML_TEMPLATE = """
 
     <script>
         let currentResults = [];
+        let currentDiscoveredUrls = [];
 
         function toggleMode() {
             const isCrawl = document.querySelector('input[name="mode"]:checked').value === 'crawl';
             document.getElementById('crawlSettings').style.display = isCrawl ? 'block' : 'none';
             document.getElementById('btnText').textContent = isCrawl ? 'Start Crawl' : 'Extract';
+        }
+
+        function toggleCrawlAll() {
+            const isAll = document.getElementById('crawlAll').checked;
+            document.getElementById('crawlLimit').disabled = isAll;
+            document.getElementById('crawlLimit').style.opacity = isAll ? '0.4' : '1';
+            document.getElementById('unlimitedHint').style.display = isAll ? 'block' : 'none';
         }
 
         document.getElementById('extractForm').addEventListener('submit', async (e) => {
@@ -397,7 +415,8 @@ HTML_TEMPLATE = """
             if (!urlInput) return;
 
             const isCrawl = document.querySelector('input[name="mode"]:checked').value === 'crawl';
-            const limit = parseInt(document.getElementById('crawlLimit').value, 10) || 10;
+            const isAll = document.getElementById('crawlAll').checked;
+            const limit = isAll ? 0 : (parseInt(document.getElementById('crawlLimit').value, 10) || 15);
 
             const submitBtn = document.getElementById('submitBtn');
             const spinner = document.getElementById('spinner');
@@ -405,7 +424,7 @@ HTML_TEMPLATE = """
 
             submitBtn.disabled = true;
             spinner.style.display = 'inline-block';
-            btnText.textContent = isCrawl ? 'Crawling...' : 'Extracting...';
+            btnText.textContent = isCrawl ? (isAll ? 'Crawling Whole Site...' : 'Crawling...') : 'Extracting...';
 
             try {
                 const response = await fetch('/api/extract', {
@@ -416,7 +435,8 @@ HTML_TEMPLATE = """
 
                 const data = await response.json();
                 currentResults = data.results || [];
-                renderResults(currentResults);
+                currentDiscoveredUrls = data.discovered_urls || [];
+                renderResults(currentResults, currentDiscoveredUrls);
             } catch (err) {
                 alert('Extraction failed: ' + err.message);
             } finally {
@@ -433,11 +453,12 @@ HTML_TEMPLATE = """
             return `<span class="badge badge-missing">Missing</span>`;
         }
 
-        function renderResults(results) {
+        function renderResults(results, discoveredUrls) {
             const container = document.getElementById('resultsContainer');
             const emptyState = document.getElementById('emptyState');
             const list = document.getElementById('resultsList');
             const count = document.getElementById('resultsCount');
+            const btnLinks = document.getElementById('btnLinksExport');
 
             if (!results || results.length === 0) {
                 container.style.display = 'none';
@@ -447,7 +468,16 @@ HTML_TEMPLATE = """
 
             emptyState.style.display = 'none';
             container.style.display = 'block';
-            count.textContent = `Extracted Metadata (${results.length} page${results.length > 1 ? 's' : ''})`;
+
+            let countText = `Extracted Metadata (${results.length} page${results.length > 1 ? 's' : ''})`;
+            if (discoveredUrls && discoveredUrls.length > 0) {
+                countText += ` • <span style="color:#60a5fa; font-weight:normal;">${discoveredUrls.length} total site URLs discovered</span>`;
+                btnLinks.style.display = 'inline-flex';
+                btnLinks.textContent = `🔗 All ${discoveredUrls.length} Site URLs (.txt)`;
+            } else {
+                btnLinks.style.display = 'none';
+            }
+            count.innerHTML = countText;
 
             list.innerHTML = results.map(item => `
                 <div class="result-item">
@@ -492,6 +522,13 @@ HTML_TEMPLATE = """
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function downloadSiteUrls() {
+            if (!currentDiscoveredUrls.length) return;
+            const content = currentDiscoveredUrls.join('\\n');
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            triggerDownload(blob, 'all_website_urls.txt');
         }
 
         function downloadExport(type) {
@@ -546,18 +583,23 @@ def create_app() -> Flask:
         data = request.get_json() or {}
         url = data.get("url", "").strip()
         is_crawl = bool(data.get("crawl", False))
-        limit = int(data.get("limit", 10))
+        limit = int(data.get("limit", 15))
 
         if not url:
             return jsonify({"error": "URL is required"}), 400
 
         if is_crawl:
             results = extractor.crawl_and_extract(url, max_urls=limit)
+            discovered = getattr(extractor, "last_discovered_urls", [])
         else:
             res = extractor.extract(url)
             results = [res]
+            discovered = [res.final_url or res.input_url]
 
-        return jsonify({"results": [r.to_dict() for r in results]})
+        return jsonify({
+            "results": [r.to_dict() for r in results],
+            "discovered_urls": discovered,
+        })
 
     return app
 
