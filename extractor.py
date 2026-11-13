@@ -423,6 +423,111 @@ class MetadataExtractor:
 
         return results
 
+    def crawl_stream(
+        self,
+        seed_url: str,
+        max_urls: int = 15,
+        delay: float = 0.05,
+    ):
+        """
+        Streaming generator for Web GUI / real-time clients.
+        Yields live progress updates, current URLs, and extracted metadata.
+        """
+        if "://" not in seed_url:
+            seed_url = f"https://{seed_url}"
+
+        seed_url = self._normalize_url(seed_url)
+        parsed_seed = urlparse(seed_url)
+        base_domain = parsed_seed.netloc.lower()
+
+        is_unlimited = max_urls <= 0
+        visited_urls: set[str] = set()
+        queued_urls: set[str] = {seed_url}
+        queue: deque[str] = deque([seed_url])
+        results: list[MetadataResult] = []
+
+        yield {
+            "type": "start",
+            "base_domain": base_domain,
+            "is_unlimited": is_unlimited,
+            "target_limit": max_urls if not is_unlimited else 0,
+        }
+
+        while queue and (is_unlimited or len(results) < max_urls):
+            current_url = queue.popleft()
+            norm_current = self._normalize_url(current_url)
+            if norm_current in visited_urls:
+                continue
+            visited_urls.add(norm_current)
+
+            yield {
+                "type": "fetching",
+                "current_url": norm_current,
+                "scanned_count": len(results),
+                "discovered_count": len(queued_urls),
+            }
+
+            res = self.extract(norm_current, extract_links=True, base_domain=base_domain)
+            results.append(res)
+
+            if res.final_url:
+                visited_urls.add(self._normalize_url(res.final_url))
+
+            for link in res.discovered_links:
+                norm_link = self._normalize_url(link)
+                if norm_link not in visited_urls and norm_link not in queued_urls:
+                    queued_urls.add(norm_link)
+                    queue.append(norm_link)
+
+            yield {
+                "type": "page",
+                "page": res.to_dict(),
+                "scanned_count": len(results),
+                "discovered_count": len(queued_urls),
+                "is_unlimited": is_unlimited,
+                "target_limit": max_urls if not is_unlimited else 0,
+            }
+
+            if delay > 0 and queue:
+                time.sleep(delay)
+
+        all_site_urls = sorted(visited_urls | queued_urls)
+        self.last_discovered_urls = all_site_urls
+
+        yield {
+            "type": "done",
+            "total_scanned": len(results),
+            "total_discovered": len(all_site_urls),
+            "discovered_urls": all_site_urls,
+        }
+
+
+def display_terminal_guide() -> None:
+    """Renders a colorful, beginner-friendly help guide in the terminal."""
+    console.print(
+        Panel.fit(
+            "[bold cyan]Meta-D[/bold cyan] [bold white]— Web Metadata Extractor & Crawler Guide[/bold white]\n"
+            "[dim]Fast, simple commands to extract metadata, audit SEO, and crawl websites.[/dim]",
+            border_style="cyan"
+        )
+    )
+
+    table = Table(show_header=True, header_style="bold magenta", expand=True)
+    table.add_column("What You Want To Do", style="bold yellow", width=25)
+    table.add_column("Command To Run", style="bold green")
+    table.add_column("Description / Notes", style="dim")
+
+    table.add_row("🖥️ Open Web GUI", "meta-d 3000", "Opens visual interactive dashboard at http://localhost:3000")
+    table.add_row("🔍 Extract Single Page", "meta-d https://python.org", "Shows title, description, canonical link & SEO status")
+    table.add_row("🕷️ Crawl 20 Pages", "meta-d https://python.org -l 20", "Automatically crawls up to 20 internal pages of the site")
+    table.add_row("🌐 Crawl Whole Website", "meta-d https://python.org --all", "Crawls every single page on the site with no limit")
+    table.add_row("📊 Save to CSV (Excel)", "meta-d https://python.org -l 20 -o site.csv", "Exports all scraped data into an Excel-ready CSV")
+    table.add_row("🔗 Export All Site URLs", "meta-d https://python.org --all --links-output urls.txt", "Saves a list of all discovered URLs to a text file")
+    table.add_row("💬 Interactive Mode", "meta-d", "Asks you step-by-step questions in the terminal")
+    table.add_row("❓ Show This Help", "meta-d help  (or meta-d -h)", "Displays this help manual")
+
+    console.print(table)
+
 
 def display_single_result(result: MetadataResult) -> None:
     """Renders a single extraction result cleanly in the terminal."""
@@ -548,9 +653,12 @@ def save_results(results: list[MetadataResult], output_path: str) -> None:
 
 
 def main() -> None:
-    # 0. Web GUI trigger: e.g. "meta-d 3000", "meta-d gui", "meta-d --gui 5000"
+    # 0. Quick Help & Guide Trigger
     if len(sys.argv) > 1:
         first_arg = sys.argv[1].strip()
+        if first_arg.lower() in ("help", "--help", "-h", "guide", "--guide", "?"):
+            display_terminal_guide()
+            return
         if first_arg.isdigit():
             from gui import start_gui
             start_gui(port=int(first_arg))
@@ -685,10 +793,14 @@ def main() -> None:
 
     while True:
         try:
-            target_url = console.input("\n[bold yellow]Enter Website or URL[/bold yellow] (or port like '3000', 'q' to quit): ").strip()
+            target_url = console.input("\n[bold yellow]Enter Website or URL[/bold yellow] (or '3000' for GUI, 'help', 'q' to quit): ").strip()
             if not target_url or target_url.lower() in ("q", "quit", "exit"):
                 console.print("[dim]Exiting extractor. Goodbye![/dim]")
                 break
+
+            if target_url.lower() in ("help", "guide", "?"):
+                display_terminal_guide()
+                continue
 
             if target_url.isdigit():
                 from gui import start_gui
