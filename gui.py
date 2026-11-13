@@ -619,11 +619,15 @@ HTML_TEMPLATE = """
             activeEventSource.onmessage = (event) => {
                 const data = JSON.parse(event.data);
 
-                if (data.type === 'fetching') {
+                if (data.type === 'start') {
+                    const workersText = data.parallel_workers ? ` • ⚡ ${data.parallel_workers} Hardware Parallel Workers` : '';
+                    liveText.textContent = (isCrawl ? (isAll ? 'Crawling Whole Website (Unlimited)...' : `Crawling Website (Target: ${limit} pages)...`) : 'Inspecting Single Page...') + workersText;
+                } else if (data.type === 'fetching') {
                     liveUrl.textContent = `Scanning: ${data.current_url}`;
                     const disc = data.discovered_count || 1;
                     const scan = data.scanned_count || 0;
-                    liveText.textContent = `Scanned ${scan} pages • Discovered ${disc} total site links`;
+                    const workersBadge = data.parallel_workers ? ` • ⚡ ${data.parallel_workers} Threads` : '';
+                    liveText.textContent = `Scanned ${scan} pages • Discovered ${disc} site links${workersBadge}`;
                     if (limit > 0) {
                         const pct = Math.min(100, Math.round((scan / limit) * 100));
                         progressFill.style.width = `${pct}%`;
