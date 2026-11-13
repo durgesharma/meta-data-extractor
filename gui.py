@@ -8,9 +8,15 @@ from __future__ import annotations
 import io
 import json
 import logging
+from pathlib import Path
 import sys
 import webbrowser
 from typing import Any
+
+# Ensure package directory is in sys.path
+_PKG_DIR = str(Path(__file__).resolve().parent)
+if _PKG_DIR not in sys.path:
+    sys.path.insert(0, _PKG_DIR)
 
 from flask import Flask, jsonify, render_template_string, request, send_file
 from rich.console import Console

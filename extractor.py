@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+from pathlib import Path
 import re
 import sys
 import time
@@ -17,6 +18,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from typing import Any
 from urllib.parse import urldefrag, urljoin, urlparse
+
+# Ensure the module's home folder is always in sys.path regardless of working directory
+_PKG_DIR = str(Path(__file__).resolve().parent)
+if _PKG_DIR not in sys.path:
+    sys.path.insert(0, _PKG_DIR)
 
 from bs4 import BeautifulSoup
 import requests
